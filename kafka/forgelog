@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Run ForgeLog from the packaged jar (build it with `mvn package`).
+#   ./forgelog cluster                     3 brokers in one process on 9091-9093
+#   ./forgelog topic create orders --partitions 3
+#   echo hello | ./forgelog produce orders
+#   ./forgelog consume orders --group demo
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+jar="$here/target/forgelog.jar"
+if [[ ! -f "$jar" ]]; then
+  echo "forgelog: $jar not found; build it first with: mvn -q -DskipTests package" >&2
+  exit 1
+fi
+exec java ${FORGELOG_JAVA_OPTS:-} -jar "$jar" "$@"
