@@ -1,5 +1,0 @@
-target/
-bench/data/
-*.aof
-*.manifest
-*.aof.tmp
