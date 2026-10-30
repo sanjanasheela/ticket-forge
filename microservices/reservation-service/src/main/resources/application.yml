@@ -1,0 +1,42 @@
+spring:
+  application:
+    name: reservation-service
+  config:
+    import: classpath:common-application.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/reservation_db?reWriteBatchedInserts=true}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+    consumer:
+      auto-offset-reset: earliest      # a fresh service must still learn about shows created before it started
+      enable-auto-commit: false
+
+server:
+  port: ${PORT:8083}
+
+ticketforge:
+  catalog:
+    url: ${CATALOG_URL:http://localhost:8082}
+  idempotency:
+    enabled: true
+  inventory:
+    strategy: ${LOCK_STRATEGY:ATOMIC_CONDITIONAL}
+    gap-rule-enabled: true
+    max-claim-attempts: 3
+  reservation:
+    sweep-interval: 1s
+    sweep-batch-size: 500
+  waitingroom:
+    access-token-ttl: 10m
+  invariants:
+    check-interval: 10s
+
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        ticketforge.hold.claim: true

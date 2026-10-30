@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: catalog-service
+  config:
+    import: classpath:common-application.yml
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/catalog_db?reWriteBatchedInserts=true}
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      acks: all                      # an event the outbox marks sent must really be durable
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 1   # keeps per-key order if a send is retried
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # A dead Redis must cost a fast fallback to Postgres, not a hung request.
+      timeout: 200ms
+      connect-timeout: 200ms
+
+server:
+  port: ${PORT:8082}
+
+ticketforge:
+  cache:
+    type: ${CACHE_TYPE:redis}        # redis | none
+    ttl: 30s
