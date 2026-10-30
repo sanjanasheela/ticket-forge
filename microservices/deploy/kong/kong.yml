@@ -1,0 +1,40 @@
+# Kong routing table (DB-less). This file is the system's public API surface:
+# anything not listed here is not reachable from outside. /internal/** is never routed.
+#
+# Regex paths start with "~". Kong tries regex routes before plain prefixes, which is how
+# "/holds/{id}/checkout" (booking) wins over "/holds" (reservation).
+_format_version: "3.0"
+
+services:
+  - name: auth-service
+    url: http://127.0.0.1:8081
+    routes:
+      - name: auth
+        paths: ["/auth", "/admin/seed/loadtest-users"]
+        strip_path: false
+
+  - name: catalog-service
+    url: http://127.0.0.1:8082
+    routes:
+      - name: catalog-reads
+        methods: [GET]
+        paths: ["/events", "~/shows/\\d+$"]
+        strip_path: false
+      - name: catalog-admin
+        paths: ["/admin/venues", "/admin/events", "/admin/shows", "/admin/seed/demo", "/admin/seed/concert-show", "/admin/seed/movie-shows"]
+        strip_path: false
+
+  - name: reservation-service
+    url: http://127.0.0.1:8083
+    read_timeout: 600000   # seat-map SSE streams are long-lived
+    routes:
+      - name: reservation
+        paths: ["~/shows/\\d+/(seats|holds|queue)", "/holds", "/admin/invariants", "/admin/inventory"]
+        strip_path: false
+
+  - name: booking-service
+    url: http://127.0.0.1:8084
+    routes:
+      - name: booking
+        paths: ["~/holds/[0-9a-fA-F-]+/checkout$", "/me/bookings", "/admin/payment-gateway"]
+        strip_path: false

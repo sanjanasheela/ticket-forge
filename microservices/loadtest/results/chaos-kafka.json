@@ -1,0 +1,96 @@
+{
+ "experiment": "kafka",
+ "phases": {
+  "read/before": [
+   1051,
+   {
+    "200": 1051
+   },
+   9,
+   3
+  ],
+  "read/during": [
+   78,
+   {
+    "200": 78
+   },
+   5,
+   2
+  ],
+  "read/after": [
+   663,
+   {
+    "200": 663
+   },
+   23,
+   4
+  ],
+  "hold/before": [
+   1051,
+   {
+    "201": 1051
+   },
+   30,
+   11
+  ],
+  "hold/during": [
+   78,
+   {
+    "201": 78
+   },
+   12,
+   7
+  ],
+  "hold/after": [
+   663,
+   {
+    "201": 663
+   },
+   32,
+   11
+  ],
+  "checkout/before": [
+   1027,
+   {
+    "201": 1027
+   },
+   1419,
+   179
+  ],
+  "checkout/during": [
+   78,
+   {
+    "201": 6,
+    "202": 72
+   },
+   5115,
+   5034
+  ],
+  "checkout/after": [
+   687,
+   {
+    "202": 24,
+    "201": 663
+   },
+   5038,
+   151
+  ]
+ },
+ "invariants": {
+  "seat_sold_twice": 0,
+  "booked_seat_without_confirmed_hold": 0,
+  "confirmed_seat_not_booked": 0,
+  "ga_counter_mismatch": 0,
+  "paid_without_booking": 0,
+  "booking_without_payment": 0,
+  "confirmed_hold_without_booking": 0,
+  "booking_without_confirmed_hold": 0,
+  "sagas_stuck_in_charged_or_refunding": 0
+ },
+ "money": {
+  "payments_succeeded_without_booking_or_refund_inflight": 0,
+  "holds_paid_more_than_once": 0,
+  "sagas_not_terminal": 0
+ },
+ "ok": true
+}

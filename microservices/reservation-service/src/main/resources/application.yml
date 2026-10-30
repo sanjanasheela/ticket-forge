@@ -11,6 +11,9 @@ spring:
       acks: all
       properties:
         enable.idempotence: true
+        linger.ms: 2
+    listener:
+      concurrency: 3     # one consumer thread per partition of the saga topics (see KAFKA_NUM_PARTITIONS)
     consumer:
       auto-offset-reset: earliest      # a fresh service must still learn about shows created before it started
       enable-auto-commit: false

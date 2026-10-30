@@ -29,6 +29,7 @@
         <module>auth-service</module>
         <module>catalog-service</module>
         <module>reservation-service</module>
+        <module>booking-service</module>
     </modules>
 
     <dependencyManagement>

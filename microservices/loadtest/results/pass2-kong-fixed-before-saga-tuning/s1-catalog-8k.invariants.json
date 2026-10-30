@@ -1,0 +1,1 @@
+{"seat_sold_twice": 0, "booked_seat_without_confirmed_hold": 0, "confirmed_seat_not_booked": 0, "ga_counter_mismatch": 0, "paid_without_booking": 0, "booking_without_payment": 0, "confirmed_hold_without_booking": 0, "booking_without_confirmed_hold": 0, "sagas_stuck_in_charged_or_refunding": 0}

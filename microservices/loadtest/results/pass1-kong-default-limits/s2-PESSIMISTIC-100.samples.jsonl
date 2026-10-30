@@ -1,0 +1,2 @@
+{"t": 1793391231.7, "app_cpu_cores": 0.65, "infra_cpu_cores": 0.43, "pg_cpu_cores": 0.46, "app_rss_mb": 1539, "pool_active": 1.0, "pool_pending": 0.0, "jvm_threads": 104.0, "heap_bytes": 347358376.0, "sse_backlog": 0.0, "queue_waiting": 0.0, "outbox_failures": null}
+{"t": 1793391232.8, "app_cpu_cores": 0.16, "infra_cpu_cores": 0.02, "pg_cpu_cores": 1.06, "app_rss_mb": 1539, "pool_active": 1.0, "pool_pending": 0.0, "jvm_threads": 104.0, "heap_bytes": 389228680.0, "sse_backlog": 0.0, "queue_waiting": 0.0, "outbox_failures": null}

@@ -24,6 +24,8 @@ server:
   port: ${PORT:8082}
 
 ticketforge:
+  reservation:
+    url: ${RESERVATION_URL:http://localhost:8083}   # seeders wait here for inventory to be built
   cache:
     type: ${CACHE_TYPE:redis}        # redis | none
     ttl: 30s

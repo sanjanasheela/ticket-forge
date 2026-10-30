@@ -67,11 +67,19 @@ class CatalogCacheTests extends CatalogTestSupport {
         dead.afterPropertiesSet();
         try {
             StringRedisTemplate template = new StringRedisTemplate(dead);
-            RedisCatalogCache cache = new RedisCatalogCache(template, new SimpleMeterRegistry(), Duration.ofSeconds(30));
+            RedisCatalogCache cache = new RedisCatalogCache(template, new SimpleMeterRegistry(), Duration.ofSeconds(30), Duration.ofSeconds(5));
 
             assertThat(cache.get("k")).isEmpty();
             cache.put("k", "v");        // must not throw
             cache.evict("k");           // must not throw
+
+            // The circuit breaker is now open: further calls must not pay the timeout again.
+            long start = System.nanoTime();
+            for (int i = 0; i < 100; i++) {
+                assertThat(cache.get("k")).isEmpty();
+                cache.put("k", "v");
+            }
+            assertThat(Duration.ofNanos(System.nanoTime() - start)).as("200 calls while the breaker is open").isLessThan(Duration.ofMillis(100));
         } finally {
             dead.destroy();
         }

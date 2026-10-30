@@ -1,7 +1,11 @@
 package com.ticketforge.messaging;
 
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.internals.RecordHeader;
@@ -21,8 +25,8 @@ import io.micrometer.core.instrument.MeterRegistry;
  * which is why every consumer is idempotent ({@link ProcessedEvents}).
  *
  * <p>Rows are claimed with {@code FOR UPDATE SKIP LOCKED}, so running several instances of a
- * service is safe. The Kafka send is waited on inside the transaction on purpose: a failed send
- * rolls back, leaving the row unsent for the next tick.
+ * service is safe. The batch's Kafka sends are waited on inside the transaction on purpose: a failed
+ * send rolls back, leaving the rows unsent for the next tick.
  */
 @Component
 class OutboxRelay {
@@ -68,23 +72,33 @@ class OutboxRelay {
                 .query((rs, i) -> new Row(rs.getLong("id"), rs.getString("topic"), rs.getString("msg_key"),
                         rs.getString("type"), rs.getString("payload")))
                 .list();
+        if (rows.isEmpty()) {
+            return 0;
+        }
+        // Send the whole batch without waiting between records, then wait once. Waiting for each ack in turn
+        // capped throughput at 1 / ack-latency (the first benchmark pass backed up thousands of checkouts behind
+        // it). Order per key is kept: the producer is idempotent, so retries cannot reorder records.
+        List<CompletableFuture<?>> sends = new ArrayList<>(rows.size());
         for (Row row : rows) {
             ProducerRecord<String, String> record = new ProducerRecord<>(row.topic(), row.key(), row.payload());
-            record.headers().add(new RecordHeader("type", row.type().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            record.headers().add(new RecordHeader("eventId", Long.toString(row.id()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-            try {
-                kafka.send(record).get(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException(e);
-            } catch (Exception e) {
-                throw new IllegalStateException("Kafka send failed for outbox row " + row.id(), e);
-            }
-            jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = :id").param("id", row.id()).update();
+            record.headers().add(new RecordHeader("type", row.type().getBytes(StandardCharsets.UTF_8)));
+            record.headers().add(new RecordHeader("eventId", Long.toString(row.id()).getBytes(StandardCharsets.UTF_8)));
+            sends.add(kafka.send(record));
         }
-        if (!rows.isEmpty()) {
-            meters.counter("ticketforge.outbox.published").increment(rows.size());
+        try {
+            CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        } catch (Exception e) {
+            // Nothing is marked sent, so the transaction ends and every row is retried. Records Kafka did accept
+            // are sent again: at-least-once, which the consumers are built for.
+            throw new IllegalStateException("Kafka send failed for an outbox batch of " + rows.size(), e);
         }
+        jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY (string_to_array(:ids, ',')::bigint[])")
+                .param("ids", rows.stream().map(r -> Long.toString(r.id())).collect(Collectors.joining(",")))
+                .update();
+        meters.counter("ticketforge.outbox.published").increment(rows.size());
         return rows.size();
     }
 }

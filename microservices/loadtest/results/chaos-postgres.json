@@ -1,0 +1,97 @@
+{
+ "experiment": "postgres",
+ "phases": {
+  "read/before": [
+   1055,
+   {
+    "200": 1055
+   },
+   15,
+   3
+  ],
+  "read/during": [
+   116,
+   {
+    "200": 116
+   },
+   4,
+   2
+  ],
+  "read/after": [
+   682,
+   {
+    "503": 24,
+    "200": 658
+   },
+   2007,
+   3
+  ],
+  "hold/before": [
+   1055,
+   {
+    "201": 1055
+   },
+   24,
+   10
+  ],
+  "hold/during": [
+   96,
+   {
+    "503": 96
+   },
+   2006,
+   2003
+  ],
+  "hold/after": [
+   702,
+   {
+    "503": 28,
+    "201": 674
+   },
+   2004,
+   12
+  ],
+  "checkout/before": [
+   1031,
+   {
+    "201": 1031
+   },
+   1331,
+   182
+  ],
+  "checkout/during": [
+   24,
+   {
+    "503": 21,
+    "500": 3
+   },
+   9044,
+   9036
+  ],
+  "checkout/after": [
+   674,
+   {
+    "201": 674
+   },
+   1380,
+   188
+  ]
+ },
+ "invariants": {
+  "seat_sold_twice": 0,
+  "booked_seat_without_confirmed_hold": 0,
+  "confirmed_seat_not_booked": 0,
+  "ga_counter_mismatch": 0,
+  "paid_without_booking": 0,
+  "booking_without_payment": 0,
+  "confirmed_hold_without_booking": 0,
+  "booking_without_confirmed_hold": 0,
+  "sagas_stuck_in_charged_or_refunding": 0
+ },
+ "money": {
+  "payments_succeeded_without_booking_or_refund_inflight": 0,
+  "holds_paid_more_than_once": 0,
+  "sagas_not_terminal": 0
+ },
+ "ok": true
+}

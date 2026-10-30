@@ -16,6 +16,11 @@ import io.micrometer.core.instrument.MeterRegistry;
  * Cache-aside on Redis with a short TTL. Every call is wrapped: Redis being down or slow costs a
  * Postgres read, never a failed request. The client timeout (see application.yml) keeps a dead
  * Redis from stalling requests.
+ *
+ * <p>Circuit breaker: after a failure Redis is skipped for {@code cooldown}. Without it every read paid the
+ * client timeout twice (get, then put): in the failure experiment median read latency went from 2 ms to 400 ms
+ * while Redis was down. While the breaker is open, evictions are skipped too, so entries cached before the outage
+ * can be served stale for at most one TTL after Redis comes back.
  */
 @Component
 @ConditionalOnProperty(name = "ticketforge.cache.type", havingValue = "redis", matchIfMissing = true)
@@ -26,16 +31,23 @@ class RedisCatalogCache implements CatalogCache {
     private final StringRedisTemplate redis;
     private final Duration ttl;
     private final MeterRegistry meters;
+    private final long cooldownNanos;
+    private volatile long skipUntilNanos;
 
     RedisCatalogCache(StringRedisTemplate redis, MeterRegistry meters,
-            @Value("${ticketforge.cache.ttl:30s}") Duration ttl) {
+            @Value("${ticketforge.cache.ttl:30s}") Duration ttl,
+            @Value("${ticketforge.cache.breaker-cooldown:5s}") Duration cooldown) {
         this.redis = redis;
         this.meters = meters;
         this.ttl = ttl;
+        this.cooldownNanos = cooldown.toNanos();
     }
 
     @Override
     public Optional<String> get(String key) {
+        if (breakerOpen()) {
+            return Optional.empty();
+        }
         try {
             String value = redis.opsForValue().get(key);
             meters.counter("ticketforge.catalog.cache", "result", value == null ? "miss" : "hit").increment();
@@ -48,6 +60,9 @@ class RedisCatalogCache implements CatalogCache {
 
     @Override
     public void put(String key, String json) {
+        if (breakerOpen()) {
+            return;
+        }
         try {
             redis.opsForValue().set(key, json, ttl);
         } catch (RuntimeException e) {
@@ -57,6 +72,9 @@ class RedisCatalogCache implements CatalogCache {
 
     @Override
     public void evict(String... keys) {
+        if (breakerOpen()) {
+            return;
+        }
         try {
             redis.delete(java.util.List.of(keys));
         } catch (RuntimeException e) {
@@ -65,7 +83,12 @@ class RedisCatalogCache implements CatalogCache {
         }
     }
 
+    private boolean breakerOpen() {
+        return System.nanoTime() < skipUntilNanos;
+    }
+
     private void degraded(String op, RuntimeException e) {
+        skipUntilNanos = System.nanoTime() + cooldownNanos;
         meters.counter("ticketforge.catalog.cache", "result", "error").increment();
         log.warn("Catalog cache {} failed, falling back to PostgreSQL: {}", op, e.toString());
     }

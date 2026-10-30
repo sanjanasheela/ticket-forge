@@ -4,7 +4,9 @@
 >
 > **The monolith stays untouched** in `../ticketforge/` as the frozen baseline. All Phase 2 code lives in `microservices/`.
 >
-> Status of this document: design. Build progress is tracked in [PHASE2_PROGRESS.md](PHASE2_PROGRESS.md).
+> Status of this document: design, kept current with what was built. Progress: [PHASE2_PROGRESS.md](PHASE2_PROGRESS.md). Results: [PHASE2_RESULTS.md](PHASE2_RESULTS.md).
+>
+> Changes from the original design, found by building and measuring: the outbox relay sends a batch and waits once (a per-record wait capped checkout throughput); saga listeners run with concurrency 3 to match the 3-partition topics; the Redis cache has a circuit breaker; `/internal/shows/{id}/ready` and the catalog seeders exist so load tests can wait for the asynchronous inventory build.
 
 ---
 

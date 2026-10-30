@@ -1,5 +1,6 @@
 package com.ticketforge.shared;
 
+import java.sql.SQLException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -7,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
+import org.springframework.jdbc.UncategorizedSQLException;
+import org.springframework.transaction.TransactionSystemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -51,5 +54,36 @@ class ApiErrorHandler {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .header("Retry-After", "1")
                 .body(new ErrorResponse("OVERLOADED", "Try again shortly", Map.of()));
+    }
+
+    /**
+     * A database connection that dies mid-transaction (database stopped or restarted) does not always surface as
+     * one of the exceptions above: found in the PostgreSQL failure experiment, three checkouts got a raw 500 from
+     * "Connection is closed" and "terminating connection due to administrator command". Only genuine
+     * connection-level failures are mapped to 503; any other error here is a bug and stays a 500.
+     */
+    @ExceptionHandler({TransactionSystemException.class, UncategorizedSQLException.class})
+    ResponseEntity<ErrorResponse> maybeConnectionLoss(Exception e) throws Exception {
+        if (isConnectionFailure(e)) {
+            return overloaded(e);
+        }
+        throw e;
+    }
+
+    static boolean isConnectionFailure(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof SQLException sql) {
+                String state = sql.getSQLState();
+                String message = sql.getMessage() == null ? "" : sql.getMessage();
+                if ((state != null && (state.startsWith("08") || state.startsWith("57P")))
+                        || message.contains("Connection is closed") || message.contains("terminating connection")) {
+                    return true;
+                }
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return false;
     }
 }
