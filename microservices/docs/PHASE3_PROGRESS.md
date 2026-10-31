@@ -29,5 +29,21 @@ Reading it honestly:
 
 Raw files: `loadtest/results/p3-*.json`.
 
-## Next
-1. 3C: single-node mini-Kafka behind the outbox relay and the consumers.
+## 3C: ForgeLog single-node broker (done, first pass)
+
+`custom/forgelog/` is a single-node Kafka-style broker: partitioned append-only logs, producer, consumer groups with a coordinator and committed offsets, and a client library. The services reach it through the `MessageBus` interface (`KafkaMessageBus` for real Kafka, `ForgeLogMessageBus` for ForgeLog), so switching backend is configuration only.
+
+| Check | Result |
+| :--- | :--- |
+| `mvn test` in `custom/forgelog` | passes |
+| k6 concert, friday and retry scenarios on ForgeLog (`loadtest/results/p3-kafka-*.json`) | all nine invariants 0 in each |
+| Broker kill during load (`loadtest/results/chaos-kafka.json`) | holds and reads stayed 2xx; checkouts went 202 (queued) during the outage and recovered after restart; invariants 0 |
+
+Caveats: single node, so no replication and no leader election yet. The file names say `kafka` but were produced with the pluggable bus; check each result's config before quoting numbers against real Kafka. A same-day real-Kafka control run is still needed for a fair comparison.
+
+## Not done
+1. Raft replication for ForgeLog (3-node cluster, leader election, partition test).
+2. 3A: custom gateway (adaptive concurrency limit, singleflight).
+3. 3D: custom LSM-tree DB (WAL, memtable, SSTables, compaction).
+4. Phase 4: driver abstraction for hot-swap, Mission Control UI.
+5. Phase 5: AWS deployment, all five chaos experiments, final comparison.
