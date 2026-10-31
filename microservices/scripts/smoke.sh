@@ -24,7 +24,7 @@ echo "venue=$VID event=$EID show=$SID"
 
 step "read the show twice (second read should come from the Redis cache)"
 curl -fsS $KONG/shows/$SID >/dev/null; curl -fsS $KONG/shows/$SID >/dev/null
-docker exec tf-redis redis-cli -p 6380 exists "catalog:show:$SID" | grep -q 1 || fail "show not cached in Redis"
+redis-cli -p "${REDIS_PORT:-6380}" exists "catalog:show:$SID" | grep -q 1 || fail "show not cached in Redis"
 echo "cached: catalog:show:$SID"
 
 step "wait for reservation-service to build the inventory from the Kafka event"
