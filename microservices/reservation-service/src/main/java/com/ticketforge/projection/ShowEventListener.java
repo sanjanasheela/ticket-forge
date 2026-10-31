@@ -1,16 +1,13 @@
 package com.ticketforge.projection;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.listener.CommonErrorHandler;
-import org.springframework.kafka.listener.DefaultErrorHandler;
-import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
-import org.springframework.util.backoff.FixedBackOff;
 
 import com.ticketforge.contracts.ShowSnapshot;
 import com.ticketforge.contracts.Topics;
+import com.ticketforge.messaging.MessageBus;
 
 import tools.jackson.databind.json.JsonMapper;
 
@@ -27,14 +24,20 @@ class ShowEventListener {
     private final ShowProjection projection;
     private final VenueLayoutClient layouts;
     private final JsonMapper json;
+    private final MessageBus bus;
 
-    ShowEventListener(ShowProjection projection, VenueLayoutClient layouts, JsonMapper json) {
+    ShowEventListener(ShowProjection projection, VenueLayoutClient layouts, JsonMapper json, MessageBus bus) {
         this.projection = projection;
         this.layouts = layouts;
         this.json = json;
+        this.bus = bus;
     }
 
-    @KafkaListener(topics = Topics.CATALOG_SHOWS, groupId = "reservation-service")
+    @PostConstruct
+    void subscribe() {
+        bus.subscribe("reservation-service", Topics.CATALOG_SHOWS, this::onShow);
+    }
+
     void onShow(String payload) {
         ShowSnapshot snapshot = json.readValue(payload, ShowSnapshot.class);
         projection.upsertShow(snapshot);
@@ -42,11 +45,5 @@ class ShowEventListener {
             projection.materialiseInventory(snapshot, layouts.fetch(snapshot.venueId()));
         }
         log.debug("Applied ShowPublished show_id={}", snapshot.showId());
-    }
-
-    /** Boot attaches this to the listener container. Default would drop the record after 9 attempts. */
-    @Bean
-    CommonErrorHandler showEventErrorHandler() {
-        return new DefaultErrorHandler(new FixedBackOff(1_000, FixedBackOff.UNLIMITED_ATTEMPTS));
     }
 }

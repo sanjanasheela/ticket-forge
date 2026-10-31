@@ -1,0 +1,94 @@
+{
+ "experiment": "forgekv",
+ "phases": {
+  "read/before": [
+   595,
+   {
+    "200": 595
+   },
+   108,
+   17
+  ],
+  "read/during": [
+   838,
+   {
+    "200": 838
+   },
+   215,
+   8
+  ],
+  "read/after": [
+   1086,
+   {
+    "200": 1086
+   },
+   206,
+   6
+  ],
+  "hold/before": [
+   595,
+   {
+    "201": 595
+   },
+   355,
+   45
+  ],
+  "hold/during": [
+   838,
+   {
+    "201": 838
+   },
+   71,
+   19
+  ],
+  "hold/after": [
+   1086,
+   {
+    "201": 1086
+   },
+   49,
+   14
+  ],
+  "checkout/before": [
+   571,
+   {
+    "201": 571
+   },
+   1424,
+   284
+  ],
+  "checkout/during": [
+   838,
+   {
+    "201": 838
+   },
+   1401,
+   184
+  ],
+  "checkout/after": [
+   1110,
+   {
+    "201": 1110
+   },
+   1449,
+   155
+  ]
+ },
+ "invariants": {
+  "seat_sold_twice": 0,
+  "booked_seat_without_confirmed_hold": 0,
+  "confirmed_seat_not_booked": 0,
+  "ga_counter_mismatch": 0,
+  "paid_without_booking": 0,
+  "booking_without_payment": 0,
+  "confirmed_hold_without_booking": 0,
+  "booking_without_confirmed_hold": 0,
+  "sagas_stuck_in_charged_or_refunding": 0
+ },
+ "money": {
+  "payments_succeeded_without_booking_or_refund_inflight": 0,
+  "holds_paid_more_than_once": 0,
+  "sagas_not_terminal": 0
+ },
+ "ok": true
+}

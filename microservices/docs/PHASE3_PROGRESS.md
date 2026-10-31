@@ -24,10 +24,10 @@ Reading it honestly:
 * The 8k run is past saturation of the shared 4-thread app tier, so it measures the services, not the cache. Parity there means the cache is not the bottleneck.
 * An earlier run of this scenario (3,467 req/s) was higher than today's control (3,001), which is why the control was re-run. Compare only runs from the same session.
 * Single runs on a shared machine: treat differences under about 20% as noise.
-* Not yet tested with ForgeKV: killing it mid-load (the circuit breaker is the same code), persistence/AOF on, multiple shards, the `DECRIF` flash-sale primitive wired into the waiting room.
+* Kill experiment (`REDIS_PORT=6381 scripts/chaos.py forgekv`, SIGKILL mid-load, restart 13 s later): reads stayed 200 throughout (before p99 108 ms, during 215 ms, after 206 ms), holds and checkouts 100% 201, all nine invariants 0, no money anomalies. Result: `loadtest/results/chaos-forgekv.json`. The restarted ForgeKV starts empty (no AOF), so the cache refills from Postgres; that is safe for a cache.
+* Not yet tested with ForgeKV: AOF persistence on, multiple shards, the `DECRIF` flash-sale primitive wired into the waiting room.
 
 Raw files: `loadtest/results/p3-*.json`.
 
 ## Next
-1. Kill-ForgeKV experiment (reuse `scripts/chaos.py` redis case with the port changed).
-2. 3C: single-node mini-Kafka behind the outbox relay and the consumers.
+1. 3C: single-node mini-Kafka behind the outbox relay and the consumers.

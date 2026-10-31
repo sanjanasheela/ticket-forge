@@ -1,18 +1,14 @@
 package com.ticketforge.messaging;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.header.internals.RecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -20,7 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import io.micrometer.core.instrument.MeterRegistry;
 
 /**
- * Publishes unsent outbox rows to Kafka, oldest first. Delivery is at least once: if the process
+ * Publishes unsent outbox rows to the message bus (Kafka or forgelog), oldest first. Delivery is at least once: if the process
  * dies after Kafka accepted a record but before the row is marked sent, the record is sent again,
  * which is why every consumer is idempotent ({@link ProcessedEvents}).
  *
@@ -39,13 +35,13 @@ class OutboxRelay {
 
     private final JdbcClient jdbc;
     private final TransactionTemplate tx;
-    private final KafkaTemplate<String, String> kafka;
+    private final MessageBus bus;
     private final MeterRegistry meters;
 
-    OutboxRelay(JdbcClient jdbc, TransactionTemplate tx, KafkaTemplate<String, String> kafka, MeterRegistry meters) {
+    OutboxRelay(JdbcClient jdbc, TransactionTemplate tx, MessageBus bus, MeterRegistry meters) {
         this.jdbc = jdbc;
         this.tx = tx;
-        this.kafka = kafka;
+        this.bus = bus;
         this.meters = meters;
     }
 
@@ -58,7 +54,7 @@ class OutboxRelay {
                 sent = n == null ? 0 : n;
             } while (sent == BATCH);
         } catch (RuntimeException e) {
-            // Kafka down or slow: rows stay unsent and are retried on the next tick. Never crash the scheduler.
+            // Broker down or slow: rows stay unsent and are retried on the next tick. Never crash the scheduler.
             log.warn("Outbox relay will retry: {}", e.toString());
             meters.counter("ticketforge.outbox.relay.failures").increment();
         }
@@ -80,10 +76,7 @@ class OutboxRelay {
         // it). Order per key is kept: the producer is idempotent, so retries cannot reorder records.
         List<CompletableFuture<?>> sends = new ArrayList<>(rows.size());
         for (Row row : rows) {
-            ProducerRecord<String, String> record = new ProducerRecord<>(row.topic(), row.key(), row.payload());
-            record.headers().add(new RecordHeader("type", row.type().getBytes(StandardCharsets.UTF_8)));
-            record.headers().add(new RecordHeader("eventId", Long.toString(row.id()).getBytes(StandardCharsets.UTF_8)));
-            sends.add(kafka.send(record));
+            sends.add(bus.send(row.topic(), row.key(), row.type(), Long.toString(row.id()), row.payload()));
         }
         try {
             CompletableFuture.allOf(sends.toArray(CompletableFuture[]::new)).get(10, TimeUnit.SECONDS);
@@ -91,9 +84,9 @@ class OutboxRelay {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         } catch (Exception e) {
-            // Nothing is marked sent, so the transaction ends and every row is retried. Records Kafka did accept
+            // Nothing is marked sent, so the transaction ends and every row is retried. Records the broker did accept
             // are sent again: at-least-once, which the consumers are built for.
-            throw new IllegalStateException("Kafka send failed for an outbox batch of " + rows.size(), e);
+            throw new IllegalStateException("Bus send failed for an outbox batch of " + rows.size(), e);
         }
         jdbc.sql("UPDATE outbox SET sent_at = now() WHERE id = ANY (string_to_array(:ids, ',')::bigint[])")
                 .param("ids", rows.stream().map(r -> Long.toString(r.id())).collect(Collectors.joining(",")))

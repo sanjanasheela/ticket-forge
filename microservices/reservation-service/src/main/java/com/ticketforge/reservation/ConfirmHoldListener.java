@@ -2,16 +2,17 @@ package com.ticketforge.reservation;
 
 import java.time.Clock;
 
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.ticketforge.contracts.SagaMessages.ConfirmHold;
 import com.ticketforge.contracts.SagaMessages.ConfirmHoldReply;
 import com.ticketforge.contracts.Topics;
+import com.ticketforge.messaging.MessageBus;
 import com.ticketforge.messaging.Outbox;
 
 import tools.jackson.databind.json.JsonMapper;
@@ -34,18 +35,24 @@ class ConfirmHoldListener {
     private final Outbox outbox;
     private final Clock clock;
     private final JsonMapper json;
+    private final MessageBus bus;
 
     ConfirmHoldListener(ReservationService reservations, JdbcClient jdbc, TransactionTemplate tx, Outbox outbox,
-            Clock clock, JsonMapper json) {
+            Clock clock, JsonMapper json, MessageBus bus) {
         this.reservations = reservations;
         this.jdbc = jdbc;
         this.tx = tx;
         this.outbox = outbox;
         this.clock = clock;
         this.json = json;
+        this.bus = bus;
     }
 
-    @KafkaListener(topics = Topics.SAGA_RESERVATION_COMMANDS, groupId = "reservation-service-saga")
+    @PostConstruct
+    void subscribe() {
+        bus.subscribe("reservation-service-saga", Topics.SAGA_RESERVATION_COMMANDS, this::onCommand);
+    }
+
     void onCommand(String payload) {
         ConfirmHold cmd = json.readValue(payload, ConfirmHold.class);
         ConfirmHoldReply reply;

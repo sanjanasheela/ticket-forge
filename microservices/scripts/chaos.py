@@ -6,7 +6,7 @@ heals it, waits for the system to settle, then checks that nothing was lost or d
 
     scripts/chaos.py <experiment> [--seconds 40] [--workers 24]
 
-    experiments: baseline | redis | catalog | reservation | booking | kafka | postgres | booking-kill9
+    experiments: baseline | redis | forgekv | catalog | reservation | booking | kafka | postgres | booking-kill9
 
 What is measured, per phase (before the fault / during it / after healing):
   reads      GET /shows/{id}                 (catalog-service, Redis cache)
@@ -88,7 +88,7 @@ def wait_exit(pid, seconds=90):
 
 def service_cmd(service, port, heap):
     jar = sorted(glob.glob(f"{ROOT}/{service}/target/{service}-*-SNAPSHOT.jar"))[0]   # glob, not a shell: ROOT contains a space
-    env = dict(os.environ, PORT=str(port), REDIS_PORT="6380", LOG_FORMAT="ecs")
+    env = dict(os.environ, PORT=str(port), REDIS_PORT=os.environ.get("REDIS_PORT", "6380"), LOG_FORMAT="ecs")
     log = open(f"{ROOT}/target/stack-logs/{service}.log", "a")
     p = subprocess.Popen(["taskset", "-c", "0,1,6,7", "java", f"-Xmx{heap}", "-jar", jar], env=env, stdout=log, stderr=log)
     open(f"{ROOT}/target/{service}.pid", "w").write(str(p.pid))
@@ -109,7 +109,23 @@ def wait_healthy(port, seconds=120):
     raise SystemExit(f"service on :{port} did not come back")
 
 
+def forgekv_pid():
+    out = sh("ss", "-ltnp", check=False)
+    for line in out.splitlines():
+        if f":{os.environ.get('REDIS_PORT', '6381')} " in line and "pid=" in line:
+            return int(line.split("pid=")[1].split(",")[0])
+    raise SystemExit("forgekv not listening")
+
+
+def forgekv_start():
+    log = open(f"{ROOT}/target/stack-logs/forgekv.log", "a")
+    subprocess.Popen(["taskset", "-c", "0,1,6,7", f"{ROOT}/custom/forgekv/forgekv", "--port", os.environ.get("REDIS_PORT", "6381"), "--shards", "1"],
+                     stdout=log, stderr=log)
+    time.sleep(3)
+
+
 FAULTS = {
+    "forgekv":     (lambda: os.kill(forgekv_pid(), 9),                  forgekv_start, "ForgeKV (custom Redis) killed with SIGKILL"),
     "redis":       (lambda: sh("docker", "stop", "tf-redis"),           lambda: sh("docker", "start", "tf-redis"), "Redis stopped"),
     "kafka":       (lambda: sh("docker", "stop", "tf-kafka"),           lambda: sh("docker", "start", "tf-kafka"), "Kafka broker stopped"),
     "postgres":    (lambda: sh("docker", "stop", "tf-pg"),              lambda: sh("docker", "start", "tf-pg"), "PostgreSQL stopped"),
