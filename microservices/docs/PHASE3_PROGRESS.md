@@ -41,9 +41,25 @@ Raw files: `loadtest/results/p3-*.json`.
 
 Caveats: single node, so no replication and no leader election yet. The file names say `kafka` but were produced with the pluggable bus; check each result's config before quoting numbers against real Kafka. A same-day real-Kafka control run is still needed for a fair comparison.
 
+## 3A: ForgeGate gateway (done, first pass)
+
+`custom/forgegate/` is a dependency-free Java reverse proxy (JDK `HttpServer` + virtual threads) in front of the four services. It has:
+* a gradient adaptive concurrency limiter (short vs long RTT, Little's Law; shrinks on latency growth or 5xx, grows by sqrt(limit)) that answers 429 + `Retry-After` when full,
+* singleflight on catalog GETs (`/events`, `/shows/{id}`), keyed by URL and Authorization,
+* a per-upstream circuit breaker (opens after 20 consecutive failures, half-opens after 3 s),
+* pass-through for the SSE streams (exempt from the limiter), and `/gate/stats`.
+
+Run: `PORT=8090 java -jar custom/forgegate/target/forgegate-*.jar`.
+
+| Check | Result |
+| :--- | :--- |
+| `mvn test` in `custom/forgegate` (singleflight, limiter shrink, breaker, end-to-end coalesce + shed) | passes |
+| Live: cache flushed, 2,000 `GET /events` at 200 concurrent through the gateway | 2,000 x 200; 217 reached catalog-service, 1,784 coalesced (89%); no sheds |
+
+Caveats: that is not "exactly one" upstream query as the spec's thundering-herd target says. Requests arriving after a flight completes start a new one, so the collapse is per overlapping window. I have not run the 15,000 RPS k6 version, measured DB CPU, or compared the limiter against Kong. Routes were mapped by hand from the controllers; only `/events` and the unit tests exercised them, so run `scripts/smoke.sh` through port 8090 before trusting the rest.
+
 ## Not done
 1. Raft replication for ForgeLog (3-node cluster, leader election, partition test).
-2. 3A: custom gateway (adaptive concurrency limit, singleflight).
-3. 3D: custom LSM-tree DB (WAL, memtable, SSTables, compaction).
-4. Phase 4: driver abstraction for hot-swap, Mission Control UI.
-5. Phase 5: AWS deployment, all five chaos experiments, final comparison.
+2. 3D: custom LSM-tree DB (WAL, memtable, SSTables, compaction).
+3. Phase 4: driver abstraction for hot-swap, Mission Control UI.
+4. Phase 5: AWS deployment, all five chaos experiments, final comparison.
