@@ -1,0 +1,2 @@
+{"fsync":false,"writes":200000,"writes_per_s":132904,"reads_per_s":205046,"hits":50000,"miss_reads_per_s":1616578,"flushes":5,"compactions":1,"tables":2}
+{"fsync":true,"writes":3000,"writes_per_s":686,"reads_per_s":646264,"hits":3000,"miss_reads_per_s":8867161,"flushes":0,"compactions":0,"tables":0}

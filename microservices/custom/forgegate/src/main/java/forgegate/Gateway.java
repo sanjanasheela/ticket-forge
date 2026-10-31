@@ -123,7 +123,7 @@ public final class Gateway {
         ex.close();
     }
 
-    String stats() {
+    public String stats() {
         return "{\"limit\":" + limiter.limit() + ",\"inflight\":" + limiter.inflight() + ",\"shed\":" + shed.sum()
                 + ",\"circuit_rejected\":" + broken.sum() + ",\"proxied\":" + proxied.sum()
                 + ",\"singleflight_leaders\":" + flight.leaders.sum() + ",\"singleflight_followers\":" + flight.followers.sum() + "}";
@@ -135,6 +135,12 @@ public final class Gateway {
         HttpServer s = HttpServer.create(new java.net.InetSocketAddress(port), 4096);
         s.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         s.createContext("/", g::handle);
+        Map<String, String> probes = new LinkedHashMap<>();
+        probes.put("auth", env("AUTH", 8081) + "/actuator/health"); probes.put("catalog", env("CATALOG", 8082) + "/actuator/health");
+        probes.put("reservation", env("RESERVATION", 8083) + "/actuator/health"); probes.put("booking", env("BOOKING", 8084) + "/actuator/health");
+        probes.put("cache", "tcp://127.0.0.1:" + System.getenv().getOrDefault("REDIS_PORT", "6380"));
+        MissionControl mc = new MissionControl(g, probes, System.getenv().getOrDefault("CHAOS_SCRIPT", "scripts/mc-chaos.sh"));
+        s.createContext("/mc", mc::handle);
         s.start();
         System.out.println("forgegate on :" + port);
     }

@@ -26,6 +26,8 @@
         <module>common</module>
         <module>custom/forgelog</module>
         <module>custom/forgegate</module>
+        <module>custom/forgeraft</module>
+        <module>custom/forgelsm</module>
         <module>messaging</module>
         <module>contracts</module>
         <module>auth-service</module>
