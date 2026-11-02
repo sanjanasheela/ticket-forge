@@ -1,0 +1,76 @@
+# Local stack for Phase 1.
+#   docker compose up -d                 -> postgres + monitoring; run the app with ./mvnw spring-boot:run
+#   docker compose --profile app up -d   -> also runs the app in a container with CPU/RAM limits (for load tests)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ticketforge
+      POSTGRES_USER: ticketforge
+      POSTGRES_PASSWORD: ticketforge
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - max_connections=200
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketforge -d ticketforge"]
+      interval: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: { cpus: "4", memory: 2g }
+
+  app:
+    profiles: ["app"]
+    build: .
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/ticketforge
+      INSTANCE_ID: app-1
+    ports: ["8080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    deploy:
+      resources:
+        limits: { cpus: "4", memory: 2g }
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    environment:
+      DATA_SOURCE_NAME: postgresql://ticketforge:ticketforge@postgres:5432/ticketforge?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports: ["9090:9090"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  pgdata:

@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: ticketforge
+    folder: TicketForge
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

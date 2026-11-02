@@ -1,0 +1,7 @@
+target/
+*.iml
+.idea/
+.vscode/
+*.log
+.env
+loadtest/results/

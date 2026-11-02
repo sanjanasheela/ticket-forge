@@ -1,0 +1,83 @@
+spring:
+  application:
+    name: ticketforge
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ticketforge?reWriteBatchedInserts=true}
+    username: ${DB_USER:ticketforge}
+    password: ${DB_PASSWORD:ticketforge}
+    hikari:
+      # Deliberately small and explicit: pool exhaustion is one of the limits Phase 1 measures.
+      maximum-pool-size: ${DB_POOL_SIZE:30}
+      minimum-idle: 10
+      connection-timeout: ${DB_POOL_TIMEOUT_MS:2000}
+      # A claim waiting longer than this on a row lock fails (and is retried) instead of piling up;
+      # no statement may pin a pooled connection for longer than the statement timeout.
+      connection-init-sql: SET lock_timeout = '${DB_LOCK_TIMEOUT:3s}'; SET statement_timeout = '${DB_STATEMENT_TIMEOUT:10s}'
+  flyway:
+    locations: classpath:db/migration
+  mvc:
+    async:
+      request-timeout: -1   # SSE streams manage their own timeouts
+
+server:
+  shutdown: graceful
+  tomcat:
+    max-connections: ${TOMCAT_MAX_CONNECTIONS:20000}
+    accept-count: 1000
+
+ticketforge:
+  auth:
+    # Dev default only. Override with JWT_SECRET (>= 32 bytes) anywhere that is not your laptop.
+    jwt-secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    access-token-ttl: 15m
+    refresh-token-ttl: 7d
+    bootstrap-admin:
+      email: ${ADMIN_EMAIL:admin@ticketforge.local}
+      password: ${ADMIN_PASSWORD:admin12345}
+  inventory:
+    strategy: ${LOCK_STRATEGY:ATOMIC_CONDITIONAL}
+    gap-rule-enabled: true
+    max-claim-attempts: 3
+  reservation:
+    sweep-interval: 1s
+    sweep-batch-size: 500
+  payment:
+    latency-ms: 150
+    jitter-ms: 100
+    failure-rate: 0.05
+    timeout-rate: 0.0
+    reconcile-after: 10s
+  waitingroom:
+    access-token-ttl: 10m
+  invariants:
+    check-interval: 10s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      instance: ${INSTANCE_ID:local}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+        ticketforge.hold.claim: true
+        ticketforge.checkout: true
+
+logging:
+  structured:
+    format:
+      console: ${LOG_FORMAT:ecs}
+    json:
+      add:
+        instance: ${INSTANCE_ID:local}

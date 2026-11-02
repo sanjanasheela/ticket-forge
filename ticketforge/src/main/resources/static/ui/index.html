@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TicketForge</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">TicketForge</a>
+    <nav>
+      <a href="#/">Events</a>
+      <a href="#/bookings">My bookings</a>
+    </nav>
+    <div id="account" class="account"></div>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <dialog id="login">
+    <form method="dialog" id="login-form">
+      <h2>Sign in</h2>
+      <label>Email <input name="email" type="email" required autocomplete="username"></label>
+      <label>Password <input name="password" type="password" minlength="8" required autocomplete="current-password"></label>
+      <p class="error" id="login-error"></p>
+      <div class="row">
+        <button type="submit" value="login" class="primary">Sign in</button>
+        <button type="submit" value="signup" class="secondary">Create account</button>
+      </div>
+      <button type="submit" value="guest" class="link" formnovalidate>Continue as a guest</button>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
